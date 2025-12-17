@@ -9,24 +9,47 @@
             margin: 0;
             padding: 0;
             overflow: hidden;
-            background-color: #1a1a1a;
+            background-color: #1a1a1a; /* Cor de fundo de segurança */
             width: 100vw;
-            height: 100vh;
+            height: 100vh; /* Garante que ocupa a tela toda */
             display: flex;
             justify-content: center;
             align-items: center;
             font-family: 'Segoe UI', sans-serif;
             touch-action: none;
+            position: relative; /* Necessário para o background funcionar */
+        }
+
+        /* 🟢 CORREÇÃO: Background em tela cheia independente do tamanho do jogo */
+        body::before {
+            content: "";
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            
+            /* Coloque aqui o caminho da sua imagem */
+            background-image: url('img/background.png'); 
+            
+            background-size: cover; /* Estica a imagem para cobrir tudo */
+            background-position: center;
+            background-repeat: no-repeat;
+            z-index: -1; /* Fica atrás do jogo */
+            
+            /* Opcional: Desfoque para destacar o jogo */
+            /* filter: blur(5px) brightness(0.6); */
         }
 
         #game-container {
             position: relative;
-            background: #fffbe6;
-            box-shadow: 0 0 50px rgba(0,0,0,0.5);
+            /* Se quiser que o tabuleiro seja transparente para ver o fundo: */
+            background: rgba(255, 251, 230, 0.9); /* Bege semi-transparente */
+            
+            /* Sombra forte para separar o jogo do fundo */
+            box-shadow: 0 0 50px rgba(0,0,0,0.8);
+            
             overflow: hidden;
-            /* Esconde o jogo enquanto carrega */
-            opacity: 0; 
-            transition: opacity 0.5s;
+            
+            /* Importante para evitar bordas brancas fantasmas */
+            display: block; 
         }
 
         canvas {
@@ -201,22 +224,32 @@
     }
 
     function resizeGame() {
+        // Usa documentElement.clientHeight que é mais seguro em mobile que window.innerHeight
         const winW = window.innerWidth;
-        const winH = window.innerHeight;
+        const winH = document.documentElement.clientHeight; 
         const winRatio = winW / winH;
+        
         let newWidth, newHeight;
+        
         if (winRatio > ASPECT_RATIO) {
-            newHeight = Math.min(winH, 800);
-            if(winH < 800) newHeight = winH;
+            // Tela é mais larga que o jogo (Desktop ou Celular deitado)
+            newHeight = winH; // Ocupa toda a altura
+            // Limite opcional para desktop não ficar gigante, se quiser pode remover o Math.min
+            newHeight = Math.min(newHeight, 900); 
+            
             newWidth = newHeight * ASPECT_RATIO;
         } else {
-            newWidth = winW;
+            // Tela é mais estreita que o jogo (Celular em pé)
+            newWidth = winW; // Ocupa toda a largura
             newHeight = newWidth / ASPECT_RATIO;
         }
+
         container.style.width = newWidth + 'px';
         container.style.height = newHeight + 'px';
+        
+        // Centraliza o scroll (ajuda em alguns navegadores mobile)
+        window.scrollTo(0, 0);
     }
-    window.addEventListener('resize', resizeGame);
 
     // --- ENGINE SETUP ---
     const engine = Engine.create({
@@ -481,3 +514,4 @@
 </script>
 </body>
 </html>
+
