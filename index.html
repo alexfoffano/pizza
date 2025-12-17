@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Suika Final + Sprites</title>
+    <title>Suika Clone</title>
     <style>
         body {
             margin: 0;
             padding: 0;
             overflow: hidden;
-            background-color: #dedede;
+            background-color: #1a1a1a;
             width: 100vw;
             height: 100vh;
             display: flex;
@@ -21,26 +21,13 @@
 
         #game-container {
             position: relative;
-            /* background: #fffbe6; */
+            background: #fffbe6;
             box-shadow: 0 0 50px rgba(0,0,0,0.5);
             overflow: hidden;
+            /* Esconde o jogo enquanto carrega */
+            opacity: 0; 
+            transition: opacity 0.5s;
         }
-		
-		#game-container::before {
-			content: "";
-			position: absolute;
-			top: 0; left: 0; right: 0; bottom: 0;
-			
-			/* Sua imagem aqui */
-			background-image: url('img/bg.png');
-			background-size: cover;
-			background-position: center;
-			
-			/* 🟢 Truque: Opacidade para ficar suave (0.3 = 30% visível) */
-			opacity: 0.3; 
-			
-			z-index: -1; /* Fica atrás de tudo */
-		}
 
         canvas {
             display: block;
@@ -48,72 +35,66 @@
             height: 100%;
         }
 
-        /* UI */
-        #ui-layer {
+        /* 🟢 TELA DE LOADING */
+        #loading-screen {
             position: absolute;
-            top: 15px;
-            right: 15px;
-            background: rgba(255,255,255,0.9);
-            padding: 8px;
-            border-radius: 12px;
-            pointer-events: none;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: #222;
+            color: #fff;
             display: flex;
             flex-direction: column;
+            justify-content: center;
             align-items: center;
-            min-width: 50px;
-            z-index: 10;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 9999;
+            transition: opacity 0.5s;
         }
-        
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #555;
+            border-top: 4px solid #FA0;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 15px;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* UI */
+        #ui-layer {
+            position: absolute; top: 15px; right: 15px;
+            background: rgba(255,255,255,0.9); padding: 8px; border-radius: 12px;
+            pointer-events: none; display: flex; flex-direction: column; align-items: center;
+            min-width: 50px; z-index: 10;
+        }
         #ui-label { font-size: 10px; color: #555; font-weight: 800; letter-spacing: 0.5px; }
-
-        /* Ajuste para mostrar a imagem na UI de "Próximo" */
         #next-fruit-display {
-            width: 35px;
-            height: 35px;
-            margin-top: 5px;
-            background-size: contain;
-            background-repeat: no-repeat;
-            background-position: center;
+            width: 35px; height: 35px; border-radius: 50%; margin-top: 5px;
+            background-size: contain; background-repeat: no-repeat; background-position: center;
         }
 
-        #score-board {
-            position: absolute;
-            top: 15px;
-            left: 20px;
-            pointer-events: none;
-            z-index: 10;
-        }
+        #score-board { position: absolute; top: 15px; left: 20px; pointer-events: none; z-index: 10; }
         #score-label { font-size: 11px; color: #999; font-weight: bold; display: block; }
         #score-val { font-size: 36px; font-weight: 900; color: #444; line-height: 1; text-shadow: 2px 2px 0 #fff; }
 
         #game-over {
-            position: absolute;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(30,30,30,0.96);
-            display: none;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            color: white;
-            z-index: 100;
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(30,30,30,0.96); display: none; flex-direction: column;
+            justify-content: center; align-items: center; color: white; z-index: 100;
         }
         #game-over button {
-            margin-top: 25px;
-            padding: 15px 40px;
-            font-size: 1.1rem;
-            font-weight: bold;
-            cursor: pointer;
-            background: #ffcc00;
-            color: #222;
-            border: none;
-            border-radius: 50px;
-            text-transform: uppercase;
+            margin-top: 25px; padding: 15px 40px; font-size: 1.1rem; font-weight: bold;
+            cursor: pointer; background: #ffcc00; color: #222; border: none;
+            border-radius: 50px; text-transform: uppercase;
         }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
 </head>
 <body>
+
+    <div id="loading-screen">
+        <div class="spinner"></div>
+        <div id="loading-text">Carregando Frutas...</div>
+    </div>
 
     <div id="game-container">
         <div id="score-board">
@@ -143,7 +124,6 @@
           World = Matter.World,
           Body = Matter.Body;
 
-    // --- CONFIGURAÇÃO ---
     const LOGICAL_WIDTH = 360;  
     const LOGICAL_HEIGHT = 640; 
     const ASPECT_RATIO = LOGICAL_WIDTH / LOGICAL_HEIGHT;
@@ -151,16 +131,10 @@
     const WALL_THICKNESS = 2000; 
     const FLOOR_OFFSET = 30; 
     const DEADLINE_Y = 130;
-
-    // 🟢 CONFIGURAÇÃO DE IMAGEM
-    // Defina aqui o tamanho em pixels das suas imagens originais (ex: 512x512)
     const ART_SIZE = 512; 
-    
-    // Caminho base das imagens (pode deixar vazio se estiverem na mesma pasta)
     const IMG_PATH = 'img/'; 
 
     const FRUITS = [
-        // img: Nome do arquivo dentro da pasta img/
         { r: 16, color: '#F00', score: 2,  img: 'fruit_0.png' },
         { r: 24, color: '#F55', score: 4,  img: 'fruit_1.png' },
         { r: 32, color: '#A0A', score: 6,  img: 'fruit_2.png' },
@@ -180,8 +154,52 @@
     const finalScoreEl = document.getElementById('final-score');
     const nextDisplay = document.getElementById('next-fruit-display');
     const container = document.getElementById('game-container');
+    const loadingScreen = document.getElementById('loading-screen');
+    const loadingText = document.getElementById('loading-text');
 
-    // --- RESIZE ---
+    // 🟢 SISTEMA DE PRELOADER
+    function preloadImages(callback) {
+        let loadedCount = 0;
+        let totalImages = FRUITS.length;
+        let errors = 0;
+
+        FRUITS.forEach((fruit, index) => {
+            const img = new Image();
+            img.src = IMG_PATH + fruit.img;
+            
+            img.onload = () => {
+                loadedCount++;
+                loadingText.innerText = `Carregando... ${Math.floor((loadedCount/totalImages)*100)}%`;
+                if (loadedCount + errors === totalImages) callback();
+            };
+            
+            img.onerror = () => {
+                console.error(`Erro ao carregar: ${fruit.img}`);
+                errors++;
+                // Mesmo com erro, continuamos para não travar o jogo (a fruta ficará com cor sólida)
+                if (loadedCount + errors === totalImages) callback();
+            };
+        });
+    }
+
+    // --- INICIALIZAÇÃO DO JOGO (Só roda após carregar imagens) ---
+    function initGame() {
+        // Esconde Loading, Mostra Jogo
+        loadingScreen.style.opacity = '0';
+        setTimeout(() => { loadingScreen.style.display = 'none'; }, 500);
+        container.style.opacity = '1';
+
+        resizeGame();
+        
+        // Inicia Engine
+        Render.run(render);
+        const runner = Runner.create();
+        Runner.run(runner, engine);
+        
+        // Spawn inicial
+        spawnNext();
+    }
+
     function resizeGame() {
         const winW = window.innerWidth;
         const winH = window.innerHeight;
@@ -199,9 +217,8 @@
         container.style.height = newHeight + 'px';
     }
     window.addEventListener('resize', resizeGame);
-    resizeGame();
 
-    // --- SETUP ENGINE ---
+    // --- ENGINE SETUP ---
     const engine = Engine.create({
         positionIterations: 16,
         velocityIterations: 16,
@@ -216,38 +233,27 @@
         options: {
             width: LOGICAL_WIDTH,
             height: LOGICAL_HEIGHT,
-            wireframes: false, // Importante: false para ver as imagens!
+            wireframes: false,
             background: 'transparent',
             pixelRatio: 1.5
         }
     });
 
-    // --- MUNDO (PAREDES) ---
+    // --- MUNDO ---
     const floorY = LOGICAL_HEIGHT + (WALL_THICKNESS / 2) - FLOOR_OFFSET;
-    
     const ground = Bodies.rectangle(LOGICAL_WIDTH/2, floorY, LOGICAL_WIDTH + 200, WALL_THICKNESS, { 
-        isStatic: true, 
-        render: { fillStyle: '#8d6e63' },
-        friction: 0.8,      
-        frictionStatic: 10,
-        restitution: 0.0,   
-        label: "ground"
+        isStatic: true, render: { fillStyle: '#8d6e63' }, friction: 0.8, frictionStatic: 10, restitution: 0.0, label: "ground"
     });
-    
     const leftWall = Bodies.rectangle(0 - WALL_THICKNESS/2, LOGICAL_HEIGHT/2, WALL_THICKNESS, LOGICAL_HEIGHT * 3, { 
         isStatic: true, render: {fillStyle: '#8d6e63'}, friction: 0.2, restitution: 0.0 
     });
     const rightWall = Bodies.rectangle(LOGICAL_WIDTH + WALL_THICKNESS/2, LOGICAL_HEIGHT/2, WALL_THICKNESS, LOGICAL_HEIGHT * 3, { 
         isStatic: true, render: {fillStyle: '#8d6e63'}, friction: 0.2, restitution: 0.0 
     });
-
     World.add(world, [ground, leftWall, rightWall]);
 
-    // --- VISUAIS (Linhas) ---
     Events.on(render, 'afterRender', function() {
         const ctx = render.context;
-        
-        // Linha de Mira
         if (currentBody && canDrop && !gameOverState) {
             ctx.beginPath();
             ctx.moveTo(currentBody.position.x, currentBody.position.y);
@@ -257,8 +263,6 @@
             ctx.setLineDash([6, 6]);
             ctx.stroke();
         }
-
-        // Linha da Morte
         ctx.beginPath();
         ctx.moveTo(0, DEADLINE_Y);
         ctx.lineTo(LOGICAL_WIDTH, DEADLINE_Y);
@@ -267,7 +271,6 @@
             const pulse = Math.sin(engine.timing.timestamp * 0.015); 
             const alpha = 0.7 + pulse * 0.3;
             const thickness = 4 + pulse * 1;
-
             ctx.strokeStyle = `rgba(255, 0, 0, ${alpha})`;
             ctx.lineWidth = thickness;
             ctx.setLineDash([12, 8]); 
@@ -279,20 +282,13 @@
             ctx.setLineDash([12, 10]);
             ctx.shadowBlur = 0;
         }
-        
         ctx.stroke();
         ctx.shadowBlur = 0;
     });
 
-    // --- CRIAÇÃO DE FRUTAS (COM SPRITES) ---
     function createFruit(x, y, tier, isStatic = false) {
         const cfg = FRUITS[tier];
-        
-        // 🟢 Cálculo Automático da Escala da Imagem
-        // O diâmetro no jogo é (cfg.r * 2).
-        // A escala é: (TamanhoDesejado / TamanhoOriginalDaImagem)
         const scale = (cfg.r * 2) / ART_SIZE;
-
         const body = Bodies.circle(x, y, cfg.r, {
             label: tier.toString(),
             isStatic: isStatic,
@@ -301,7 +297,6 @@
             frictionAir: 0.02,
             density: 0.0015,
             render: { 
-                // Se o arquivo da imagem não existir, ele usa o fillStyle como backup
                 fillStyle: cfg.color,
                 sprite: {
                     texture: IMG_PATH + cfg.img,
@@ -310,15 +305,11 @@
                 }
             }
         });
-
-        if (isStatic) {
-            body.isInvulnerable = true;
-        }
+        if (isStatic) body.isInvulnerable = true;
         return body;
     }
 
     function createMergeEffect(x, y, color) {
-        // Mantemos partículas coloridas pois imagens de partículas podem pesar
         for (let i = 0; i < 8; i++) {
             const particle = Bodies.circle(x, y, 5, {
                 render: { fillStyle: color },
@@ -333,7 +324,6 @@
         }
     }
 
-    // --- GAME LOOP ---
     let currentBody = null;
     let nextTier = 0;
     let canDrop = true;
@@ -360,9 +350,7 @@
         if (gameOverState) return;
         const tier = nextTier;
         nextTier = pickNextTier();
-        
-        // 🟢 Atualiza a UI com a imagem
-        nextDisplay.style.backgroundColor = 'transparent'; // Remove cor de fundo
+        nextDisplay.style.backgroundColor = 'transparent';
         nextDisplay.style.backgroundImage = `url(${IMG_PATH + FRUITS[nextTier].img})`;
         
         currentBody = createFruit(LOGICAL_WIDTH / 2, 50, tier, true);
@@ -370,7 +358,6 @@
         canDrop = true;
     }
 
-    // --- INPUT ---
     function handleInput(clientX) {
         if (!currentBody || !canDrop || gameOverState) return;
         const rect = render.canvas.getBoundingClientRect();
@@ -395,7 +382,6 @@
     container.addEventListener('touchmove', e => { e.preventDefault(); handleInput(e.touches[0].clientX); }, { passive: false });
     container.addEventListener('touchend', handleRelease);
 
-    // --- COLISÃO ---
     Events.on(engine, 'collisionStart', (event) => {
         const pairs = event.pairs;
         const processed = new Set(); 
@@ -416,13 +402,10 @@
                 if (tier < FRUITS.length - 1) {
                     let newX = (bodyA.position.x + bodyB.position.x) / 2;
                     let newY = (bodyA.position.y + bodyB.position.y) / 2;
-                    
                     World.remove(world, [bodyA, bodyB]);
-
                     const nextTierIdx = tier + 1;
                     const finalRadius = FRUITS[nextTierIdx].r;
                     
-                    // Clamp
                     const floorYVisual = LOGICAL_HEIGHT - FLOOR_OFFSET;
                     if (newY + finalRadius > floorYVisual) newY = floorYVisual - finalRadius;
                     if (newX - finalRadius < 0) newX = finalRadius;
@@ -432,7 +415,6 @@
                     
                     const newFruit = createFruit(newX, newY, nextTierIdx);
                     
-                    // Crescimento Suave
                     const prevRadius = FRUITS[tier].r;
                     const scaleStart = prevRadius / finalRadius;
                     Body.scale(newFruit, scaleStart, scaleStart);
@@ -440,26 +422,20 @@
                     newFruit.currentScale = scaleStart;
                     newFruit.targetScale = 1.0;
                     newFruit.growSpeed = 0.06; 
-
                     Body.setVelocity(newFruit, { x: 0, y: 0 });
                     Body.setAngularVelocity(newFruit, 0);
-
                     World.add(world, newFruit);
                 }
             }
         }
     });
 
-    // --- LOOP LÓGICO ---
     Events.on(engine, 'beforeUpdate', () => {
         const bodies = Composite.allBodies(world);
         let danger = false;
         
         bodies.forEach(body => {
-            // Vida
             if (!body.isStatic) body.lifeTime = (body.lifeTime || 0) + 1;
-
-            // Crescimento
             if (body.isGrowing) {
                 let scaleFactor = 1 + body.growSpeed;
                 body.currentScale *= scaleFactor;
@@ -471,19 +447,12 @@
                     Body.scale(body, scaleFactor, scaleFactor);
                 }
             }
-            
-            // Invulnerabilidade
             if (body.isInvulnerable) {
                 if (body.position.y - body.circleRadius > DEADLINE_Y) body.isInvulnerable = false;
                 else if (body.lifeTime > 60 && body.speed < 0.2) body.isInvulnerable = false;
             }
+            if (body.position.y > LOGICAL_HEIGHT + WALL_THICKNESS) World.remove(world, body);
 
-            // Anti-bug
-            if (body.position.y > LOGICAL_HEIGHT + WALL_THICKNESS) {
-                World.remove(world, body);
-            }
-
-            // Game Over Check
             if (!body.isStatic && body !== currentBody && body.label !== "ground") {
                 if (!body.isInvulnerable) {
                     if (body.position.y < DEADLINE_Y && body.velocity.y < 0.2 && body.velocity.y > -0.2 && !body.isGrowing) {
@@ -506,10 +475,8 @@
         }
     });
 
-    spawnNext();
-    Render.run(render);
-    const runner = Runner.create();
-    Runner.run(runner, engine);
+    // 🟢 INICIA O PRELOADER
+    preloadImages(initGame);
 
 </script>
 </body>
