@@ -173,6 +173,36 @@ Events.on(render, 'afterRender', function() {
     ctx.shadowBlur = 0;
 });
 
+// --- TOASTY! ---
+const toastyEl = document.getElementById('toasty-guy');
+let isToastyActive = false; // Para evitar sobreposição de animações
+
+function triggerToasty() {
+    // 1. Verifica se já está na tela
+    if (isToastyActive) return;
+
+    // 2. Chance aleatória (ex: 10% de chance a cada fusão)
+    // Ajuste o 0.1 para aumentar ou diminuir a frequência
+    if (Math.random() > 0.05) return; 
+
+    // 3. Ativa o efeito
+    isToastyActive = true;
+    toastyEl.classList.add('appear');
+    
+    // (Opcional) Se tiver um som, toque aqui:
+    // audioToasty.play(); 
+
+    // 4. Remove após 2 segundos (2000ms)
+    setTimeout(() => {
+        toastyEl.classList.remove('appear');
+        
+        // Reseta a flag após a animação de saída terminar (300ms do CSS)
+        setTimeout(() => {
+            isToastyActive = false;
+        }, 300);
+    }, 2000);
+}
+
 // --- CRIAÇÃO DE FRUTAS ---
 function createFruit(x, y, tier, isStatic = false) {
     const cfg = FRUITS[tier];
@@ -327,6 +357,7 @@ Events.on(engine, 'collisionStart', (event) => {
 
         if (bodyA.label === bodyB.label && !bodyA.isStatic && !bodyB.isStatic) {
             const tier = parseInt(bodyA.label);
+            triggerToasty(); // Tenta disparar o Toasty sempre que houver fusão
             score += FRUITS[tier].score;
             scoreEl.innerText = score;
 
