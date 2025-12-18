@@ -4,7 +4,8 @@ body {
     overflow: hidden;
     background-color: #1a1a1a;
     width: 100vw;
-    height: 100vh;
+    height: 100dvh;
+	min-height: 100%;
     display: flex;
     justify-content: center;
     align-items: center;
@@ -134,4 +135,5 @@ canvas {
     border: none;
     border-radius: 50px;
     text-transform: uppercase;
+
 }
