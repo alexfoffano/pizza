@@ -4,7 +4,7 @@ body {
     overflow: hidden;
     background-color: #1a1a1a;
     width: 100vw;
-    height: 100vh;
+    height: 100dvh;
     display: flex;
     justify-content: center;
     align-items: center;
@@ -71,8 +71,8 @@ canvas {
 
 @media screen and (max-width: 768px) and (orientation: portrait) {
     #toasty-guy img {
-        width: 160px;
-        height: 200px;
+        width: 240px;
+        height: 300px;
     }
 }
 
@@ -169,4 +169,5 @@ canvas {
     border-radius: 50px;
     text-transform: uppercase;
 }
+
 
