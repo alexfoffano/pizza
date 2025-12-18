@@ -183,7 +183,7 @@ function triggerToasty() {
 
     // 2. Chance aleatória (ex: 10% de chance a cada fusão)
     // Ajuste o 0.1 para aumentar ou diminuir a frequência
-    if (Math.random() > 0.05) return; 
+    if (Math.random() > 0.1) return; 
 
     // 3. Ativa o efeito
     isToastyActive = true;
@@ -447,3 +447,4 @@ Events.on(engine, 'beforeUpdate', () => {
 
 // 🟢 INICIA
 preloadImages(initGame);
+
