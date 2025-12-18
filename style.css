@@ -64,9 +64,16 @@ canvas {
 }
 
 #toasty-guy img {
-    width: 160px;
-    height: 200px;
+    width: 320px;
+    height: 400px;
     display: block;
+}
+
+@media screen and (max-width: 768px) and (orientation: portrait) {
+    #toasty-guy img {
+        width: 160px;
+        height: 200px;
+    }
 }
 
 /* Classe que ativa a aparição */
@@ -162,3 +169,4 @@ canvas {
     border-radius: 50px;
     text-transform: uppercase;
 }
+
