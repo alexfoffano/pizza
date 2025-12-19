@@ -16,7 +16,7 @@ const WALL_THICKNESS = 2000;
 const FLOOR_OFFSET = 30; 
 const DEADLINE_Y = 130;
 
-// 🟢 IMAGENS
+// --- IMAGENS & ASSETS ---
 const ART_SIZE = 512; 
 const IMG_PATH = 'img/'; 
 
@@ -34,52 +34,144 @@ const FRUITS = [
     { r: 126,color: '#080', score: 22, img: 'fruit_10.png'}
 ];
 
+// Configuração dos Sons e Toasty
+const popSounds = []; // Array para guardar os audios carregados
+const soundFiles = ['sounds/pop1.mp3', 'sounds/pop2.mp3', 'sounds/pop3.mp3', 'sounds/pop4.mp3'];
+const toastyImg = new Image(); 
+const toastySrc = 'img/toasty.png'; // Substitua se tiver imagem local
+
+// --- VARIÁVEIS GLOBAIS ---
 let score = 0;
 let dangerCounter = 0;
+let currentBody = null;
+let nextTier = 0;
+let canDrop = true;
+let gameOverState = false;
+let runner; // Agora é global para poder reiniciar
+let assetsLoaded = 0;
+let totalAssets = 0;
+
+// Elementos do DOM
 const scoreEl = document.getElementById('score-val');
 const finalScoreEl = document.getElementById('final-score');
 const nextDisplay = document.getElementById('next-fruit-display');
 const container = document.getElementById('game-container');
 const loadingScreen = document.getElementById('loading-screen');
 const loadingText = document.getElementById('loading-text');
+const toastyEl = document.getElementById('toasty-guy');
 
-// 🟢 PRELOADER DE IMAGENS
-function preloadImages(callback) {
-    let loadedCount = 0;
-    let total = FRUITS.length;
-    let errors = 0;
+// --- SISTEMA DE SOM ---
+function playRandomPop() {
+    if (popSounds.length === 0) return; 
 
-    FRUITS.forEach(fruit => {
+    const index = Math.floor(Math.random() * popSounds.length);
+    const originalAudio = popSounds[index];
+    
+    // Clona para permitir sobreposição rápida de sons
+    if (originalAudio) {
+        const soundClone = originalAudio.cloneNode(); 
+        soundClone.volume = 0.5; // Ajuste de volume
+        soundClone.play().catch(e => {
+            // Ignora erros de autoplay antes da interação do usuário
+        });
+    }
+}
+
+// --- PRELOADER UNIFICADO ---
+function preloadAssets() {
+    // Total = Frutas + Toasty + Sons
+    totalAssets = FRUITS.length + 1 + soundFiles.length;
+    console.log(`Iniciando carregamento de ${totalAssets} recursos...`);
+
+    // 1. Carregar Frutas
+    FRUITS.forEach((fruit) => {
         const img = new Image();
         img.src = IMG_PATH + fruit.img;
-        
-        img.onload = () => {
-            loadedCount++;
-            loadingText.innerText = `Carregando... ${Math.floor((loadedCount/total)*100)}%`;
-            if (loadedCount + errors === total) callback();
-        };
-        
-        img.onerror = () => {
-            console.error("Erro ao carregar imagem: " + fruit.img);
-            errors++; 
-            if (loadedCount + errors === total) callback();
+        img.onload = () => { checkLoad(); };
+        img.onerror = () => { 
+            console.error(`Erro fruta: ${fruit.img}`); 
+            checkLoad(); 
         };
     });
+
+    // 2. Carregar Toasty
+    toastyImg.src = toastySrc;
+    toastyImg.onload = () => {
+        const el = document.querySelector('#toasty-guy img');
+        if(el) el.src = toastySrc; 
+        checkLoad();
+    };
+    toastyImg.onerror = () => checkLoad();
+
+    // 3. Carregar Sons
+    soundFiles.forEach((file) => {
+        const audio = new Audio();
+        audio.src = file;
+        audio.addEventListener('canplaythrough', () => { checkLoad(); }, { once: true });
+        audio.addEventListener('error', () => { 
+            console.warn("Falha som:", file); 
+            checkLoad(); 
+        }, { once: true });
+        popSounds.push(audio);
+    });
+}
+
+function checkLoad() {
+    assetsLoaded++;
+    if (loadingText) {
+        loadingText.innerText = `Carregando... ${Math.floor((assetsLoaded/totalAssets)*100)}%`;
+    }
+
+    if (assetsLoaded >= totalAssets) {
+        console.log("Assets carregados. Iniciando jogo.");
+        initGame();
+    }
 }
 
 // --- INICIALIZAÇÃO ---
 function initGame() {
-    loadingScreen.style.opacity = '0';
-    setTimeout(() => { loadingScreen.style.display = 'none'; }, 500);
+    if (loadingScreen) {
+        loadingScreen.style.opacity = '0';
+        setTimeout(() => { loadingScreen.style.display = 'none'; }, 500);
+    }
     container.style.opacity = '1';
 
     resizeGame();
     
     Render.run(render);
-    const runner = Runner.create();
+    
+    // Criação do Runner Global
+    runner = Runner.create();
     Runner.run(runner, engine);
     
     spawnNext();
+}
+
+// --- LÓGICA DE REINICIAR (RESET) ---
+function resetGame() {
+    // 1. Limpa todas as frutas (mantém paredes e chão)
+    World.clear(world, true);
+    
+    // 2. Reseta variáveis
+    score = 0;
+    scoreEl.innerText = score;
+    dangerCounter = 0;
+    gameOverState = false;
+    currentBody = null;
+    isToastyActive = false;
+    
+    // 3. Interface
+    document.getElementById('game-over').style.display = 'none';
+    
+    // 4. Reinicia motor e spawna fruta
+    Runner.run(runner, engine);
+    spawnNext();
+}
+
+// Conecta o botão de reiniciar
+const restartBtn = document.getElementById('restart-btn');
+if (restartBtn) {
+    restartBtn.addEventListener('click', resetGame);
 }
 
 // --- RESIZE CONTROLADO ---
@@ -173,30 +265,20 @@ Events.on(render, 'afterRender', function() {
     ctx.shadowBlur = 0;
 });
 
-// --- TOASTY! ---
-const toastyEl = document.getElementById('toasty-guy');
-let isToastyActive = false; // Para evitar sobreposição de animações
+// --- TOASTY! LOGIC ---
+let isToastyActive = false;
 
 function triggerToasty() {
-    // 1. Verifica se já está na tela
-    if (isToastyActive) return;
+    if (isToastyActive || !toastyEl) return;
 
-    // 2. Chance aleatória (ex: 10% de chance a cada fusão)
-    // Ajuste o 0.1 para aumentar ou diminuir a frequência
+    // Chance de 10% (0.1)
     if (Math.random() > 0.1) return; 
 
-    // 3. Ativa o efeito
     isToastyActive = true;
     toastyEl.classList.add('appear');
     
-    // (Opcional) Se tiver um som, toque aqui:
-    // audioToasty.play(); 
-
-    // 4. Remove após 2 segundos (2000ms)
     setTimeout(() => {
         toastyEl.classList.remove('appear');
-        
-        // Reseta a flag após a animação de saída terminar (300ms do CSS)
         setTimeout(() => {
             isToastyActive = false;
         }, 300);
@@ -246,11 +328,6 @@ function createMergeEffect(x, y, color) {
 }
 
 // --- GAME LOOP ---
-let currentBody = null;
-let nextTier = 0;
-let canDrop = true;
-let gameOverState = false;
-
 function pickNextTier() {
     let maxOnField = 0;
     Composite.allBodies(world).forEach(b => {
@@ -281,9 +358,7 @@ function spawnNext() {
     canDrop = true;
 }
 
-// --- INPUT HANDLERS (ATUALIZADO) ---
-
-// Função que calcula a posição e move a fruta
+// --- INPUT HANDLERS ---
 function handleInput(clientX) {
     if (!currentBody || !canDrop || gameOverState) return;
     
@@ -291,12 +366,10 @@ function handleInput(clientX) {
     const scale = LOGICAL_WIDTH / rect.width;
     let x = (clientX - rect.left) * scale;
     
-    // Clamp (Limite lateral para não sair da tela)
     const r = currentBody.circleRadius;
     if (x < r) x = r;
     if (x > LOGICAL_WIDTH - r) x = LOGICAL_WIDTH - r;
     
-    // Atualiza a posição IMEDIATAMENTE
     Body.setPosition(currentBody, { x: x, y: 50 });
 }
 
@@ -304,18 +377,9 @@ function handleRelease() {
     if (!currentBody || !canDrop || gameOverState) return;
     canDrop = false;
 	
-    // 1. Libera a física
     Body.setStatic(currentBody, false);
-    
-    // 🟢 2. Posição de Rotação Inicial Aleatória
-    // Math.random() * Math.PI * 2 gera um ângulo entre 0 e 360 graus (em radianos)
-    // Assim a fruta não cai sempre "de pé", ela pode cair deitada, diagonal, etc.
     Body.setAngle(currentBody, Math.random() * Math.PI * 2);
 
-    // 🟢 3. Impulso de Giro (Torque Inicial)
-    // (Math.random() - 0.5) gera um número entre -0.5 e 0.5
-    // Multiplicamos por 0.2 para ser suave.
-    // Resultado: Gira um pouquinho para esquerda ou direita aleatoriamente.
     const spinForce = (Math.random() - 0.5) * 0.2;
     Body.setAngularVelocity(currentBody, spinForce);
 
@@ -323,14 +387,13 @@ function handleRelease() {
     setTimeout(spawnNext, 500);
 }
 
-// 🟢 Mouse: Move a fruta assim que clica (mousedown)
+// Mouse
 container.addEventListener('mousedown', e => handleInput(e.clientX));
 container.addEventListener('mousemove', e => handleInput(e.clientX));
 container.addEventListener('mouseup', handleRelease);
 
-// 🟢 Toque: Move a fruta assim que toca a tela (touchstart)
+// Touch
 container.addEventListener('touchstart', e => { 
-    // preventDefault evita comportamentos de scroll/zoom do navegador
     if(e.cancelable) e.preventDefault(); 
     handleInput(e.touches[0].clientX); 
 }, { passive: false });
@@ -357,7 +420,10 @@ Events.on(engine, 'collisionStart', (event) => {
 
         if (bodyA.label === bodyB.label && !bodyA.isStatic && !bodyB.isStatic) {
             const tier = parseInt(bodyA.label);
-            triggerToasty(); // Tenta disparar o Toasty sempre que houver fusão
+			
+            playRandomPop(); // Som!
+            triggerToasty(); // Toasty!
+            
             score += FRUITS[tier].score;
             scoreEl.innerText = score;
 
@@ -438,13 +504,15 @@ Events.on(engine, 'beforeUpdate', () => {
             gameOverState = true;
             finalScoreEl.innerText = "Score Final: " + score;
             document.getElementById('game-over').style.display = 'flex';
-            Runner.stop(runner);
+            
+            // Para o runner (trava a física)
+            if(runner) Runner.stop(runner);
         }
     } else {
         dangerCounter = 0;
     }
 });
 
-// 🟢 INICIA
-preloadImages(initGame);
-
+// --- INÍCIO DO PROCESSO ---
+// Começa o preloader assim que o script é lido pelo navegador
+window.onload = preloadAssets;
