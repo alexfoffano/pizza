@@ -171,7 +171,14 @@ function resetGame() {
 // Conecta o botão de reiniciar
 const restartBtn = document.getElementById('restart-btn');
 if (restartBtn) {
+    // 1. O clique padrão (funciona no Desktop e Androids modernos se não for cancelado)
     restartBtn.addEventListener('click', resetGame);
+
+    // 2. CORREÇÃO PARA MOBILE
+    // Isso intercepta o toque no botão ANTES dele subir para o container do jogo.
+    restartBtn.addEventListener('touchstart', (e) => {
+        e.stopPropagation(); // Diz: "Pare aqui! Não avise o container que toquei na tela"
+    }, { passive: false });
 }
 
 // --- RESIZE CONTROLADO ---
@@ -516,3 +523,4 @@ Events.on(engine, 'beforeUpdate', () => {
 // --- INÍCIO DO PROCESSO ---
 // Começa o preloader assim que o script é lido pelo navegador
 window.onload = preloadAssets;
+
